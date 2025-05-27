@@ -1,131 +1,112 @@
 package com.example.userapp
 
-import android.content.Intent
 import android.os.Bundle
-import android.util.Log
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import com.example.userapp.R // Assuming R is in com.example.userapp
-import com.example.userapp.data.db.AppDatabase // Import AppDatabase
-import com.example.userapp.data.db.UserDao // Import UserDao
-import com.example.userapp.data.db.UserEntity // Import UserEntity
-import com.example.userapp.data.model.User // Import User model
-import com.example.userapp.data.network.RetrofitInstance
+import com.example.userapp.data.db.AppDatabase
+import com.example.userapp.data.network.SoapService
 import com.example.userapp.data.repository.UserRepository
-import com.example.userapp.ui.login.LoginActivity
 import com.example.userapp.util.CompanyCodeManager
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
+    private lateinit var etCompanyCode: EditText
+    private lateinit var btnSaveCompanyCode: Button
+    private lateinit var tvCurrentCompanyCode: TextView // Will be used for status messages too
+    private lateinit var btnFetchUsers: Button
+    private lateinit var progressBar: ProgressBar
+
     private lateinit var userRepository: UserRepository
-    private lateinit var companyCodeStatusText: TextView
-    private lateinit var userDao: UserDao // Declare UserDao
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        userRepository = UserRepository(RetrofitInstance.api)
-        userDao = AppDatabase.getDatabase(applicationContext).userDao() // Initialize UserDao
+        // Initialize UI elements
+        etCompanyCode = findViewById(R.id.etCompanyCode)
+        btnSaveCompanyCode = findViewById(R.id.btnSaveCompanyCode)
+        tvCurrentCompanyCode = findViewById(R.id.tvCurrentCompanyCode) // Reusing for status
+        btnFetchUsers = findViewById(R.id.btnFetchUsers)
+        progressBar = findViewById(R.id.progressBar)
 
-        companyCodeStatusText = findViewById(R.id.companyCodeStatusText)
-        val syncDataButton: Button = findViewById(R.id.syncDataButton)
+        // Instantiate UserRepository
+        val userDao = AppDatabase.getDatabase(applicationContext).userDao()
+        // SoapService is an object (singleton), so we pass it directly
+        userRepository = UserRepository(SoapService, userDao)
 
-        syncDataButton.setOnClickListener {
-            checkCompanyCodeAndFetchUsers(forceShowDialog = true)
-        }
+        // Load and display existing company code
+        loadAndDisplayCompanyCode()
 
-        checkCompanyCodeAndFetchUsers()
-    }
-
-    private fun checkCompanyCodeAndFetchUsers(forceShowDialog: Boolean = false) {
-        val companyCode = CompanyCodeManager.getCompanyCode(this)
-        if (companyCode == null || forceShowDialog) {
-            promptForCompanyCode()
-        } else {
-            companyCodeStatusText.text = "Company Code: $companyCode. Fetching users..."
-            fetchUsers(companyCode)
-        }
-    }
-
-    private fun promptForCompanyCode() {
-        val editText = EditText(this)
-        AlertDialog.Builder(this)
-            .setTitle("Enter Company Code")
-            .setView(editText)
-            .setPositiveButton("Save") { dialog, _ ->
-                val code = editText.text.toString().trim()
-                if (code.isNotBlank()) {
-                    CompanyCodeManager.saveCompanyCode(this, code)
-                    companyCodeStatusText.text = "Company Code: $code. Fetching users..."
-                    fetchUsers(code)
-                } else {
-                    Toast.makeText(this, "Company code cannot be empty", Toast.LENGTH_SHORT).show()
-                    companyCodeStatusText.text = "Company code not set. Navigating to login..."
-                    navigateToLogin() // Navigate if code is empty after trying to save
-                }
-                dialog.dismiss()
-            }
-            .setNegativeButton("Cancel") { dialog, _ ->
-                companyCodeStatusText.text = "Company code not set. Navigating to login..."
-                navigateToLogin() // Navigate on cancel
-                dialog.cancel()
-            }
-            .setOnDismissListener {
-                if (CompanyCodeManager.getCompanyCode(this) == null) {
-                     if (!companyCodeStatusText.text.toString().endsWith("Navigating to login...")) {
-                        companyCodeStatusText.text = "Company code entry skipped. Navigating to login..."
-                        navigateToLogin()
-                     }
-                }
-            }
-            .setCancelable(true)
-            .show()
-    }
-
-    private fun fetchUsers(code: String) {
-        lifecycleScope.launch {
-            val userList: List<User>? = userRepository.fetchUsersFromServer(code)
-            if (userList != null) {
-                Log.d("MainActivity", "Successfully fetched ${userList.size} users from server.")
-                companyCodeStatusText.append("\nFetched ${userList.size} users from server.")
-
-                // Map User to UserEntity
-                val userEntities = userList.map { user ->
-                    UserEntity(login = user.login, nombre = user.nombre, pass = user.pass)
-                }
-
-                try {
-                    userDao.clearAllUsers()
-                    Log.d("MainActivity", "Cleared old users from DB.")
-                    userDao.insertAll(userEntities)
-                    Log.d("MainActivity", "Successfully inserted ${userEntities.size} users into DB.")
-                    companyCodeStatusText.append("\nStored ${userEntities.size} users in local DB.")
-                    Toast.makeText(applicationContext, "Users synchronized to local DB", Toast.LENGTH_LONG).show()
-                } catch (e: Exception) {
-                    Log.e("MainActivity", "Error saving users to DB", e)
-                    companyCodeStatusText.append("\nError saving users to local DB.")
-                    Toast.makeText(applicationContext, "Error saving users locally: ${e.message}", Toast.LENGTH_LONG).show()
-                }
-
+        // Set OnClickListener for the save company code button
+        btnSaveCompanyCode.setOnClickListener {
+            val companyCode = etCompanyCode.text.toString().trim()
+            if (companyCode.isNotBlank()) {
+                CompanyCodeManager.saveCompanyCode(this, companyCode)
+                tvCurrentCompanyCode.text = "Current Company Code: $companyCode"
+                Toast.makeText(this, "Company code saved!", Toast.LENGTH_SHORT).show()
             } else {
-                Log.e("MainActivity", "Failed to fetch users from server.")
-                companyCodeStatusText.append("\nFailed to fetch data from server.")
-                Toast.makeText(applicationContext, "Failed to fetch data from server", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "Company code cannot be empty", Toast.LENGTH_SHORT).show()
             }
-            navigateToLogin() // Navigate after attempting fetch and DB ops
+        }
+
+        // Set OnClickListener for the fetch users button
+        btnFetchUsers.setOnClickListener {
+            val companyCode = CompanyCodeManager.getCompanyCode(this)
+            if (companyCode.isNullOrEmpty()) {
+                Toast.makeText(this, "Please save a company code first.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            lifecycleScope.launch {
+                // Update UI before starting
+                tvCurrentCompanyCode.text = "Loading users for company: $companyCode..."
+                progressBar.visibility = View.VISIBLE
+                btnFetchUsers.isEnabled = false
+                btnSaveCompanyCode.isEnabled = false // Also disable save button during fetch
+
+                val success = userRepository.fetchAndSaveUsers(companyCode)
+
+                // Update UI after completion
+                progressBar.visibility = View.GONE
+                btnFetchUsers.isEnabled = true
+                btnSaveCompanyCode.isEnabled = true
+
+                if (success) {
+                    // To show user count, we'd need a method in UserRepository to get users from DB
+                    // For now, just a success message.
+                    // val usersInDb = userRepository.userDao.getAllUsers() // Example, assumes getAllUsers is suspend
+                    // tvCurrentCompanyCode.text = "Users loaded: ${usersInDb.size}. Current Code: $companyCode"
+                    tvCurrentCompanyCode.text = "Users loaded/updated successfully for code: $companyCode!"
+                    Toast.makeText(this@MainActivity, "Users loaded/updated successfully!", Toast.LENGTH_LONG).show()
+                } else {
+                    tvCurrentCompanyCode.text = "Failed to load users for code: $companyCode. Check logs."
+                    Toast.makeText(this@MainActivity, "Failed to load users. Check logs.", Toast.LENGTH_LONG).show()
+                }
+                // Re-display company code if it was overwritten by status message and fetch failed
+                // Or, if successful, keep the success message for a bit or update with count.
+                // For simplicity here, we'll leave the status message.
+                // To revert to just company code:
+                // loadAndDisplayCompanyCode() 
+            }
         }
     }
 
-    private fun navigateToLogin() {
-        val intent = Intent(this@MainActivity, LoginActivity::class.java)
-        startActivity(intent)
-        finish() 
+    private fun loadAndDisplayCompanyCode() {
+        val companyCode = CompanyCodeManager.getCompanyCode(this)
+        if (companyCode != null && companyCode.isNotBlank()) {
+            etCompanyCode.setText(companyCode)
+            // Update the text view to show the current company code,
+            // especially if it was previously used for status messages.
+            tvCurrentCompanyCode.text = "Current Company Code: $companyCode"
+        } else {
+            tvCurrentCompanyCode.text = "Current Company Code: Not Set"
+        }
     }
 }

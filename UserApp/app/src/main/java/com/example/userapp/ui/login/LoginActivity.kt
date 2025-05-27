@@ -1,67 +1,70 @@
 package com.example.userapp.ui.login
 
+import android.content.Intent
 import android.os.Bundle
-import android.util.Base64 // Import Base64
-import android.util.Log // Import Log
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
-import android.widget.Toast
+import android.widget.TextView
+// Toast can be removed if tvLoginError is the primary feedback mechanism
+// import android.widget.Toast 
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.example.userapp.MainActivity // Import MainActivity
 import com.example.userapp.R
 import com.example.userapp.data.db.AppDatabase
-import com.example.userapp.data.db.UserDao
+// SoapService is needed for UserRepository instantiation
+import com.example.userapp.data.network.SoapService 
+import com.example.userapp.data.repository.UserRepository
 import kotlinx.coroutines.launch
-import java.nio.charset.StandardCharsets // For specifying charset
+// No need for Base64 or Log here if UserRepository handles all logic and logging
 
 class LoginActivity : AppCompatActivity() {
 
-    private lateinit var userDao: UserDao
-    private lateinit var editTextUsername: EditText
-    private lateinit var editTextPassword: EditText
-    private lateinit var buttonLogin: Button
+    private lateinit var userRepository: UserRepository
+    private lateinit var etLoginUsername: EditText
+    private lateinit var etLoginPassword: EditText
+    private lateinit var btnLogin: Button
+    private lateinit var tvLoginError: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_login)
 
-        userDao = AppDatabase.getDatabase(applicationContext).userDao()
+        // Instantiate UserRepository
+        val userDao = AppDatabase.getDatabase(applicationContext).userDao()
+        // SoapService is an object, so we pass it directly.
+        userRepository = UserRepository(SoapService, userDao)
 
-        editTextUsername = findViewById(R.id.editTextUsername)
-        editTextPassword = findViewById(R.id.editTextPassword)
-        buttonLogin = findViewById(R.id.buttonLogin)
+        // Initialize UI Elements
+        etLoginUsername = findViewById(R.id.etLoginUsername)
+        etLoginPassword = findViewById(R.id.etLoginPassword)
+        btnLogin = findViewById(R.id.btnLogin)
+        tvLoginError = findViewById(R.id.tvLoginError)
 
-        buttonLogin.setOnClickListener {
-            val username = editTextUsername.text.toString().trim()
-            val plainTextPasswordInput = editTextPassword.text.toString().trim() // User inputs plain text
+        btnLogin.setOnClickListener {
+            val username = etLoginUsername.text.toString().trim()
+            // Password should not be trimmed, as spaces can be part of a password.
+            val password = etLoginPassword.text.toString() 
 
-            if (username.isNotEmpty() && plainTextPasswordInput.isNotEmpty()) {
-                lifecycleScope.launch {
-                    val user = userDao.getUserByUsername(username)
-                    if (user != null && user.pass != null) { // Check if user and stored pass are not null
-                        try {
-                            // Decode the stored Base64 password
-                            val decodedPasswordBytes = Base64.decode(user.pass, Base64.DEFAULT)
-                            val decodedPasswordStored = String(decodedPasswordBytes, StandardCharsets.UTF_8)
+            if (username.isEmpty() || password.isEmpty()) {
+                tvLoginError.text = "Username and password cannot be empty."
+                tvLoginError.visibility = View.VISIBLE
+                return@setOnClickListener
+            }
 
-                            if (decodedPasswordStored == plainTextPasswordInput) {
-                                Toast.makeText(applicationContext, "Login Correcto", Toast.LENGTH_LONG).show()
-                                // TODO: Navigate to another part of the app if login is successful
-                            } else {
-                                Toast.makeText(applicationContext, "Invalid username or password", Toast.LENGTH_LONG).show()
-                            }
-                        } catch (e: IllegalArgumentException) {
-                            // Handle cases where user.pass is not a valid Base64 string
-                            Log.e("LoginActivity", "Error decoding password for user: $username", e)
-                            Toast.makeText(applicationContext, "Login error: Invalid stored password format", Toast.LENGTH_LONG).show()
-                        }
-                    } else {
-                        // User not found or stored password is null
-                        Toast.makeText(applicationContext, "Invalid username or password", Toast.LENGTH_LONG).show()
-                    }
+            tvLoginError.visibility = View.GONE // Clear previous error
+
+            lifecycleScope.launch {
+                val isAuthenticated = userRepository.authenticateUser(username, password)
+                if (isAuthenticated) {
+                    // tvLoginError.visibility = View.GONE // Already done before launch
+                    startActivity(Intent(this@LoginActivity, MainActivity::class.java))
+                    finish() // Remove LoginActivity from the back stack
+                } else {
+                    tvLoginError.text = "Invalid username or password."
+                    tvLoginError.visibility = View.VISIBLE
                 }
-            } else {
-                Toast.makeText(applicationContext, "Please enter username and password", Toast.LENGTH_SHORT).show()
             }
         }
     }

@@ -8,17 +8,46 @@
     tools:context=".MainActivity">
 
     <TextView
-        android:id="@+id/companyCodeStatusText"
+        android:id="@+id/tvCurrentCompanyCode"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Checking company code..."
+        android:text="Current Company Code: Not Set"
         android:textSize="16sp" />
 
+    <EditText
+        android:id="@+id/etCompanyCode"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:hint="Enter Company Code"
+        android:inputType="text" />
+
     <Button
-        android:id="@+id/syncDataButton"
+        android:id="@+id/btnSaveCompanyCode"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:text="Enter/Sync Company Code" />
+        android:text="Save Company Code" />
+
+    <Button
+        android:id="@+id/btnFetchUsers"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Fetch and Save Users" />
+
+    <ProgressBar
+        android:id="@+id/progressBar"
+        style="?android:attr/progressBarStyle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="16dp"
+        android:visibility="gone"
+        tools:visibility="visible"/>
+
+    <!-- TextView for status messages, can be tvCurrentCompanyCode or a new one like tvStatus -->
+    <!-- For now, will reuse tvCurrentCompanyCode for simplicity of this subtask,
+         but a dedicated tvStatus might be better in a full implementation. -->
 
 </LinearLayout>
