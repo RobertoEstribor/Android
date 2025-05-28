@@ -3,41 +3,34 @@ package com.example.userapp.ui.login
 import android.os.Bundle
 import android.util.Base64 // Import Base64
 import android.util.Log // Import Log
-import android.widget.Button
-import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import com.example.userapp.R
 import com.example.userapp.data.db.AppDatabase
 import com.example.userapp.data.db.UserDao
+import com.example.userapp.databinding.ActivityLoginBinding
 import kotlinx.coroutines.launch
 import java.nio.charset.StandardCharsets // For specifying charset
 
 class LoginActivity : AppCompatActivity() {
 
     private lateinit var userDao: UserDao
-    private lateinit var editTextUsername: EditText
-    private lateinit var editTextPassword: EditText
-    private lateinit var buttonLogin: Button
+    private lateinit var binding: ActivityLoginBinding
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_login)
+        binding = ActivityLoginBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
         userDao = AppDatabase.getDatabase(applicationContext).userDao()
 
-        editTextUsername = findViewById(R.id.editTextUsername)
-        editTextPassword = findViewById(R.id.editTextPassword)
-        buttonLogin = findViewById(R.id.buttonLogin)
+        binding.buttonLogin.setOnClickListener {
+            val login = binding.editTextUsername.text.toString().trim()
+            val plainTextPasswordInput = binding.editTextPassword.text.toString().trim() // User inputs plain text
 
-        buttonLogin.setOnClickListener {
-            val username = editTextUsername.text.toString().trim()
-            val plainTextPasswordInput = editTextPassword.text.toString().trim() // User inputs plain text
-
-            if (username.isNotEmpty() && plainTextPasswordInput.isNotEmpty()) {
+            if (login.isNotEmpty() && plainTextPasswordInput.isNotEmpty()) {
                 lifecycleScope.launch {
-                    val user = userDao.getUserByUsername(username)
+                    val user = userDao.getUserByLogin(login)
                     if (user != null && user.pass != null) { // Check if user and stored pass are not null
                         try {
                             // Decode the stored Base64 password
@@ -52,7 +45,7 @@ class LoginActivity : AppCompatActivity() {
                             }
                         } catch (e: IllegalArgumentException) {
                             // Handle cases where user.pass is not a valid Base64 string
-                            Log.e("LoginActivity", "Error decoding password for user: $username", e)
+                            Log.e("LoginActivity", "Error decoding password for user: $login", e)
                             Toast.makeText(applicationContext, "Login error: Invalid stored password format", Toast.LENGTH_LONG).show()
                         }
                     } else {
