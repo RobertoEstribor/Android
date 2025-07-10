@@ -1,0 +1,64 @@
+apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+apply plugin: 'kotlin-kapt' // Necesario para Room y otros procesadores de anotaciones
+
+android {
+    compileSdkVersion 34 // O la versión más reciente que tengas configurada
+    defaultConfig {
+        applicationId "com.example.yourappname"
+        minSdkVersion 21
+        targetSdkVersion 34
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+    buildFeatures {
+        viewBinding true
+    }
+    namespace 'com.example.yourappname' // Asegúrate que esto coincida con tu package name
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version" // $kotlin_version debe estar definido en tu build.gradle de proyecto
+    implementation 'androidx.core:core-ktx:1.12.0' // Actualizado a una versión más reciente
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.11.0' // Actualizado
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+
+    // ViewModel y LiveData
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0' // Actualizado
+    implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.7.0' // Actualizado
+
+    // Retrofit para llamadas a la red
+    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
+    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
+    implementation 'com.squareup.okhttp3:logging-interceptor:4.11.0' // Actualizado (o la más reciente)
+
+    // Room para base de datos local
+    implementation 'androidx.room:room-runtime:2.6.1' // Actualizado
+    kapt 'androidx.room:room-compiler:2.6.1' // Usar kapt para procesadores de anotaciones en Kotlin
+    implementation 'androidx.room:room-ktx:2.6.1'
+
+    // Coroutines para trabajo asíncrono
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3' // Actualizado
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3'
+
+    // Pruebas
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+}
